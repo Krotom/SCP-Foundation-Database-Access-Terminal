@@ -1,0 +1,1 @@
+this is an encryptor test file, open the terminal and try out the cmd 'encrypt' and 'decrypt'
