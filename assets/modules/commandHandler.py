@@ -1,8 +1,5 @@
 import os
-from time import sleep as sl
-import math
 import pyfiglet
-import sqlite3
 import subprocess
 import types
 import random
@@ -13,7 +10,7 @@ from modules.authSys import set_lockout, new_alias, remove_alias, add_notice, re
 from modules.chronicle_engine import chronicle_log, clean_slate
 import colorama
 from modules.dbUtils import LDBConn
-from colorama import Fore, Back, Style
+from colorama import Fore, Back
 from modules.animations import access_anim
 from modules.access import access, search, db_deactive, update_dataset, export_scp
 from modules.usrActions import main as usractions
@@ -21,9 +18,10 @@ from ESDS import run_esds
 from cryptography.fernet import Fernet
 colorama.init(autoreset=True)
 variables = dict()
+incognito = False
 
 
-figlet = pyfiglet.figlet_format("SCP", font="doh") + Fore.LIGHTCYAN_EX + pyfiglet.figlet_format("Foundation", font="standard")
+figlet = str(pyfiglet.figlet_format("SCP", font="doh")) + Fore.LIGHTCYAN_EX + str(pyfiglet.figlet_format("Foundation", font="standard"))
 figlet = str(figlet).replace("\n", "\n\t\t\t")
 
 available_cmds = f"""Current available commands:
@@ -223,7 +221,7 @@ def mainlogonloop(username, password, fromlc, inc, msg=None):
     if fromlc:
         print(Fore.BLACK + Back.GREEN + "\t~~~~MANUAL LOCKOUT OVERRIDE CONFIRMED~~~~")
         chronicle_log("<<LOCKOUT OVERRIDDEN>>", incognito)
-    print(pyfiglet.figlet_format(f"Welcome Back {username}", font="contessa").center(50))
+    print(str(pyfiglet.figlet_format(f"Welcome Back {username}", font="contessa")).center(50))
     if msg:
         print(msg)
     print("Login successful!")
@@ -237,248 +235,249 @@ def mainlogonloop(username, password, fromlc, inc, msg=None):
             continue
         cmd = cmmd[0].lower()
         chronicle_log(f"USER:{username} Ran command: {''.join(cn + ' ' for cn in cmmd)}", incognito)
-        if cmd == "quit" or cmd == "exit":
-            chronicle_log("<<TERMINAL EXIT>>", incognito)
-            quit("Exiting...")
-        elif cmd == "logout":
-            break
-        elif cmd == "clean":
-            clean_slate()
-            incognito = True
-            print(f"{Back.GREEN}Activity logs deleted succesfully{Back.RESET}")
-        elif cmd == "usredit":
-            usractions(incognito)
-        elif cmd == "help":
-            if len(cmmd) == 1:
-                print(available_cmds)
-            elif len(cmmd) >= 3:
-                print("This command accepts only one optional argument")
-            elif cmmd[1] in cmd_help:
-                print(cmd_help[cmd[1]])
-            else:
-                print("No detailed help available for this command")
-        elif cmd == "evaluate":
-            if len(cmmd) == 1:
-                print(
-                    "This command requires an expression to run, you can also type loop as an expression to enter looped calculation mode")
-            elif cmd_all.replace("ev ", "evaluate ").lower() == "evaluate loop":
-                print(f"{Fore.MAGENTA}Entering Looped Calculation Mode | Type 'EXIT' to quit")
-                while True:
-                    exp = input("Enter expression: ")
-                    if exp == "EXIT":
-                        break
-                    run_calculator(exp, incognito)
-            else:
-                run_calculator(cmd_all.replace("ev ", "").replace("evaluate ", ""), incognito)
-        elif cmd == "encrypt":
-            if len(cmmd) != 2:
-                print("Usage: encrypt <file_path>")
-            else:
-                file_path = cmmd[1]
-                if not os.path.isfile(file_path):
-                    print(f"File {file_path} does not exist.")
+        match cmd:
+            case "quit" | "exit":
+                chronicle_log("<<TERMINAL EXIT>>", incognito)
+                quit("Exiting...")
+            case "logout":
+                break
+            case "clean":
+                clean_slate()
+                incognito = True
+                print(f"{Back.GREEN}Activity logs deleted succesfully{Back.RESET}")
+            case "usredit":
+                usractions(incognito)
+            case "help":
+                if len(cmmd) == 1:
+                    print(available_cmds)
+                elif len(cmmd) >= 3:
+                    print("This command accepts only one optional argument")
+                elif cmmd[1] in cmd_help:
+                    print(cmd_help[cmmd[1]])
                 else:
-                    key = Fernet.generate_key()
-                    encrypt_file(file_path, key)
-                    os.remove(file_path)
-                    print(f"Encryption key: {key.decode()} Please store it safely to decrypt the file.")
-        elif cmd == "decrypt":
-            if len(cmmd) != 3:
-                print("Usage: decrypt <file_path> <key>")
-            else:
-                file_path = cmmd[1]
-                key = cmmd[2].encode()
-                if not os.path.isfile(file_path):
-                    print(f"File {file_path} does not exist.")
+                    print("No detailed help available for this command")
+            case "evaluate":
+                if len(cmmd) == 1:
+                    print(
+                        "This command requires an expression to run, you can also type loop as an expression to enter looped calculation mode")
+                elif cmd_all.replace("ev ", "evaluate ").lower() == "evaluate loop":
+                    print(f"{Fore.MAGENTA}Entering Looped Calculation Mode | Type 'EXIT' to quit")
+                    while True:
+                        exp = input("Enter expression: ")
+                        if exp == "EXIT":
+                            break
+                        run_calculator(exp, incognito)
                 else:
-                    decrypt_file(file_path, key)
-                    os.remove(file_path)
-        elif cmd == "uptime":
-            boot_time_timestamp = psutil.boot_time()
-            bt = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(boot_time_timestamp))
-            current_time = time.time()
-            uptime_seconds = current_time - boot_time_timestamp
-            uptime_str = time.strftime("%H:%M:%S", time.gmtime(uptime_seconds))
-            print(f"System boot time: {bt}")
-            print(f"Uptime: {uptime_str}")
-        elif cmd == "export_scp":
-            if len(cmmd) == 1:
-                print("Please specify an SCP no and a file format: export_scp <SCP-No> <file_format>")
-            elif len(cmmd) >= 4:
-                print("This command only accepts two arguments")
-            elif len(cmmd) == 2:
-                print("Please specify a file format: export_scp <SCP-No> <file_format>")
-            elif len(cmmd) == 3:
-                export_scp(cmmd[1], cmmd[2])
-        elif cmd == "log":
-            if len(cmmd) == 1:
-                print("Please specify a message with the command: log <msg>")
-            elif len(cmmd) >= 3:
-                print("This command accepts only one argument")
-            elif len(cmmd) == 2:
-                if not incognito:
-                    chronicle_log(cmmd[1], incognito)
+                    run_calculator(cmd_all.replace("ev ", "").replace("evaluate ", ""), incognito)
+            case "encrypt":
+                if len(cmmd) != 2:
+                    print("Usage: encrypt <file_path>")
                 else:
-                    print("Incognito mode active, logging disabled. So not logging your message")
-        elif cmd == "trace":
-            if len(cmmd) != 2:
-                print("Usage: trace <address>")
-            else:
-                address = cmmd[1]
-                try:
-                    subprocess.run(["tracert", address])
-                except Exception as e:
-                    print(f"Error executing tracert: {e}")
-        elif cmd == "notice":
-            if len(cmmd) == 1:
-                print("""Availaable Sub-Commands:
-                add <SCP No.> <type> <extra> <notice> <Unique Identifier>
-                remove <SCP No.> <Unique Identifier>""")
-            elif cmmd[1] == "add":
-                if len(cmmd) != 6:
-                    print(f"""Usage:
-                    notice add <SCP No.> <type> <extra> <Unique Identifier>
-                    eg. notice add SCP-173 {Fore.GREEN}General{Fore.CYAN} 001-ALPHA{Fore.RESET} N01
-                    Enter notice | 'END' to end: {Fore.MAGENTA}This is a notice{Fore.RESET}
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-                    This will bring out the text below when SCP-173 is accessed:
-                    {Fore.GREEN}General{Fore.RESET} Notice {Fore.CYAN}001-ALPHA{Fore.RESET}: {Fore.MAGENTA}This is a notice""")
-                else:
-                    current = 1
-                    looping = True
-                    no = cmmd[2]
-                    not_type = cmmd[3]
-                    extra = cmmd[4]
-                    identifier = cmmd[5]
-                    notice = ""
-                    while looping:
-                        if current == 1:
-                            line = input("Enter first line: ")
-                            current = 0
-                        else:
-                            line = "\n" + input("Enter new line | 'END' to end: ")
-                        if line.strip() != "END":
-                            notice += line
-                        else:
-                            looping = False
-                    add_notice(no, not_type, extra, notice, identifier)
-            elif cmmd[1] == "remove":
-                if len(cmmd) != 4:
-                    print("""Usage:
-                    notice remove <SCP No.> <Unique Identifier>""")
-                else:
-                    no = cmmd[2]
-                    identifier = cmmd[3]
-                    rem_notice(no, identifier)
-        elif cmd == "alias":
-            if len(cmmd) == 1:
-                print("""Available Sub-commands:
-                list
-                add [alias] [command]
-                remove [alias]""")
-            elif cmmd[1] == "list":
-                conn = LDBConn()
-                cursor = conn.cursor()
-                cursor.execute('SELECT alias, command FROM alias')
-                rows = cursor.fetchall()
-                for row in rows:
-                    print(f"{row[0]} = {row[1]}")
-                conn.close()
-            elif cmmd[1] == "add":
-                if len(cmmd) != 4:
-                    print("Usage: alias add [alias] [command]")
-                else:
-                    alias = cmmd[2]
-                    command = cmmd[3]
-                    conn = LDBConn()
-                    cursor = conn.cursor()
-                    cursor.execute('SELECT 1 FROM alias WHERE alias = ?', (alias,))
-                    if cursor.fetchone() is None:
-                        cursor.execute('INSERT INTO alias (alias, command) VALUES (?, ?)', (alias, command))
-                        print(f"Alias '{alias}' added with command '{command}'.")
+                    file_path = cmmd[1]
+                    if not os.path.isfile(file_path):
+                        print(f"File {file_path} does not exist.")
                     else:
-                        print(f"Alias '{alias}' already exists.")
-                    conn.commit()
-                    conn.close()
-            elif cmmd[1] == "remove":
+                        key = Fernet.generate_key()
+                        encrypt_file(file_path, key)
+                        os.remove(file_path)
+                        print(f"Encryption key: {key.decode()} Please store it safely to decrypt the file.")
+            case "decrypt":
                 if len(cmmd) != 3:
-                    print("Usage: alias remove [alias]")
+                    print("Usage: decrypt <file_path> <key>")
                 else:
-                    alias = cmmd[2]
+                    file_path = cmmd[1]
+                    key = cmmd[2].encode()
+                    if not os.path.isfile(file_path):
+                        print(f"File {file_path} does not exist.")
+                    else:
+                        decrypt_file(file_path, key)
+                        os.remove(file_path)
+            case "uptime":
+                boot_time_timestamp = psutil.boot_time()
+                bt = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(boot_time_timestamp))
+                current_time = time.time()
+                uptime_seconds = current_time - boot_time_timestamp
+                uptime_str = time.strftime("%H:%M:%S", time.gmtime(uptime_seconds))
+                print(f"System boot time: {bt}")
+                print(f"Uptime: {uptime_str}")
+            case "export_scp":
+                if len(cmmd) == 1:
+                    print("Please specify an SCP no and a file format: export_scp <SCP-No> <file_format>")
+                elif len(cmmd) >= 4:
+                    print("This command only accepts two arguments")
+                elif len(cmmd) == 2:
+                    print("Please specify a file format: export_scp <SCP-No> <file_format>")
+                elif len(cmmd) == 3:
+                    export_scp(cmmd[1], cmmd[2])
+            case "log":
+                if len(cmmd) == 1:
+                    print("Please specify a message with the command: log <msg>")
+                elif len(cmmd) >= 3:
+                    print("This command accepts only one argument")
+                elif len(cmmd) == 2:
+                    if not incognito:
+                        chronicle_log(cmmd[1], incognito)
+                    else:
+                        print("Incognito mode active, logging disabled. So not logging your message")
+            case "trace":
+                if len(cmmd) != 2:
+                    print("Usage: trace <address>")
+                else:
+                    address = cmmd[1]
+                    try:
+                        subprocess.run(["tracert", address])
+                    except Exception as e:
+                        print(f"Error executing tracert: {e}")
+            case "notice":
+                if len(cmmd) == 1:
+                    print("""Availaable Sub-Commands:
+                    add <SCP No.> <type> <extra> <notice> <Unique Identifier>
+                    remove <SCP No.> <Unique Identifier>""")
+                elif cmmd[1] == "add":
+                    if len(cmmd) != 6:
+                        print(f"""Usage:
+                        notice add <SCP No.> <type> <extra> <Unique Identifier>
+                        eg. notice add SCP-173 {Fore.GREEN}General{Fore.CYAN} 001-ALPHA{Fore.RESET} N01
+                        Enter notice | 'END' to end: {Fore.MAGENTA}This is a notice{Fore.RESET}
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        This will bring out the text below when SCP-173 is accessed:
+                        {Fore.GREEN}General{Fore.RESET} Notice {Fore.CYAN}001-ALPHA{Fore.RESET}: {Fore.MAGENTA}This is a notice""")
+                    else:
+                        current = 1
+                        looping = True
+                        no = cmmd[2]
+                        not_type = cmmd[3]
+                        extra = cmmd[4]
+                        identifier = cmmd[5]
+                        notice = ""
+                        while looping:
+                            if current == 1:
+                                line = input("Enter first line: ")
+                                current = 0
+                            else:
+                                line = "\n" + input("Enter new line | 'END' to end: ")
+                            if line.strip() != "END":
+                                notice += line
+                            else:
+                                looping = False
+                        add_notice(no, not_type, extra, notice, identifier)
+                elif cmmd[1] == "remove":
+                    if len(cmmd) != 4:
+                        print("""Usage:
+                        notice remove <SCP No.> <Unique Identifier>""")
+                    else:
+                        no = cmmd[2]
+                        identifier = cmmd[3]
+                        rem_notice(no, identifier)
+            case "alias":
+                if len(cmmd) == 1:
+                    print("""Available Sub-commands:
+                    list
+                    add [alias] [command]
+                    remove [alias]""")
+                elif cmmd[1] == "list":
                     conn = LDBConn()
                     cursor = conn.cursor()
-                    cursor.execute('DELETE FROM alias WHERE alias = ?', (alias,))
-                    if cursor.rowcount > 0:
-                        print(f"Alias '{alias}' removed.")
-                    else:
-                        print(f"Alias '{alias}' not found.")
-                    conn.commit()
+                    cursor.execute('SELECT alias, command FROM alias')
+                    rows = cursor.fetchall()
+                    for row in rows:
+                        print(f"{row[0]} = {row[1]}")
                     conn.close()
-        elif cmd == "search":
-            if len(cmmd) > 1:
-                search(cmmd, incognito)
-            else:
-                print("Search command requires a keyword")
-        elif cmd == "inco":
-            incognito = not incognito
-            print(f"{Fore.YELLOW}Current INCOGNITO state: {incognito}")
-        elif cmd == "update":
-            update_dataset(incognito)
-        elif cmd == "vars":
-            show_vars(incognito)
-        elif cmd == "lockdown":
-            rusure = input("""This will initiate an immediate lockout procedure on your current frontend!
-    And it will not be able to disabled without the LBC!
-    Are you sure? This will require your password to be entered. Y/N: """)
-            if rusure.lower() == "y":
-                paswd = input("Please enter your password(Enter EXIT to exit): ")
-                if paswd == password:
-                    set_lockout(1, 1)
-                    print("Lockout initiated")
-                    chronicle_log("<<TERMINAL MANUAL LOCKOUT INITIATED>>", incognito)
-                    break
-                elif paswd == "EXIT":
+                elif cmmd[1] == "add":
+                    if len(cmmd) != 4:
+                        print("Usage: alias add [alias] [command]")
+                    else:
+                        alias = cmmd[2]
+                        command = cmmd[3]
+                        conn = LDBConn()
+                        cursor = conn.cursor()
+                        cursor.execute('SELECT 1 FROM alias WHERE alias = ?', (alias,))
+                        if cursor.fetchone() is None:
+                            cursor.execute('INSERT INTO alias (alias, command) VALUES (?, ?)', (alias, command))
+                            print(f"Alias '{alias}' added with command '{command}'.")
+                        else:
+                            print(f"Alias '{alias}' already exists.")
+                        conn.commit()
+                        conn.close()
+                elif cmmd[1] == "remove":
+                    if len(cmmd) != 3:
+                        print("Usage: alias remove [alias]")
+                    else:
+                        alias = cmmd[2]
+                        conn = LDBConn()
+                        cursor = conn.cursor()
+                        cursor.execute('DELETE FROM alias WHERE alias = ?', (alias,))
+                        if cursor.rowcount > 0:
+                            print(f"Alias '{alias}' removed.")
+                        else:
+                            print(f"Alias '{alias}' not found.")
+                        conn.commit()
+                        conn.close()
+            case "search":
+                if len(cmmd) > 1:
+                    search(cmmd, incognito)
+                else:
+                    print("Search command requires a keyword")
+            case "inco":
+                incognito = not incognito
+                print(f"{Fore.YELLOW}Current INCOGNITO state: {incognito}")
+            case "update":
+                update_dataset(incognito)
+            case "vars":
+                show_vars(incognito)
+            case "lockdown":
+                rusure = input("""This will initiate an immediate lockout procedure on your current frontend!
+        And it will not be able to disabled without the LBC!
+        Are you sure? This will require your password to be entered. Y/N: """)
+                if rusure.lower() == "y":
+                    paswd = input("Please enter your password(Enter EXIT to exit): ")
+                    if paswd == password:
+                        set_lockout(1, 1)
+                        print("Lockout initiated")
+                        chronicle_log("<<TERMINAL MANUAL LOCKOUT INITIATED>>", incognito)
+                        break
+                    elif paswd == "EXIT":
+                        print("Command terminated")
+                        break
+                    else:
+                        print("Wrong password!")
+                else:
                     print("Command terminated")
-                    break
-                else:
-                    print("Wrong password!")
-            else:
-                print("Command terminated")
-        elif cmd == "access":
-            if len(cmmd) == 1:
-                print("Please use the command with an SCP No or enter 'random' to access a random SCP")
-            elif len(cmmd) >= 3:
-                print("This command only accepts one argument")
-            elif len(cmmd) == 2:
-                if cmmd[1].lower() == "random":
-                    rand = random.randint(1, 6999)
-                    frand = f"{rand:04d}" if rand >= 1000 else f"{rand:03d}"
-                    chronicle_log(f"Random SCP -> SCP-{frand} accessed", incognito)
-                    access(frand)
-                elif cmmd[1] == "001" or cmmd[1].lower() == "scp-001":
-                    access_anim(f"{Fore.RED}ACCESS DENIED{Fore.RESET}", 10)
-                    chronicle_log("<<ACCESS TO SCP-001 IS RESTRICTED TO O5 COUNCIL MEMBERS>>", incognito)
-                    restricted()
-                else:
-                    try:
-                        cmmmd = int(cmmd)
-                        acc = f"{cmmmd:04d}" if cmmmd >= 1000 else f"{cmmmd:03d}"
-                        chronicle_log(f"SCP-{acc} accessed", incognito)
-                        access(acc)
-                    except TypeError:
-                        chronicle_log(f"{cmmd[1]} accessed", incognito)
-                        access(cmmd[1])
-        elif cmd == "cls" or cmd == "clear":
-            os.system('cls' if os.name == 'nt' else 'clear')
-            chronicle_log("<<TERMINAL CLEARED>>", incognito)
-        elif cmd in ccs:
-            ccs[cmd](cmmd, cmd_all)
-        elif cmd == "esds":
-            os.system('cls' if os.name == 'nt' else 'clear')
-            run_esds(incognito)
-        else:
-            print(f"{Fore.RED}{cmd} is not an internal or external command | Error: Command Not Found")
-            chronicle_log(f"{cmd} is an unknown command", incognito)
+            case "access":
+                if len(cmmd) == 1:
+                    print("Please use the command with an SCP No or enter 'random' to access a random SCP")
+                elif len(cmmd) >= 3:
+                    print("This command only accepts one argument")
+                elif len(cmmd) == 2:
+                    if cmmd[1].lower() == "random":
+                        rand = random.randint(1, 6999)
+                        frand = f"{rand:04d}" if rand >= 1000 else f"{rand:03d}"
+                        chronicle_log(f"Random SCP -> SCP-{frand} accessed", incognito)
+                        access(frand)
+                    elif cmmd[1] == "001" or cmmd[1].lower() == "scp-001":
+                        access_anim(f"{Fore.RED}ACCESS DENIED{Fore.RESET}", 10)
+                        chronicle_log("<<ACCESS TO SCP-001 IS RESTRICTED TO O5 COUNCIL MEMBERS>>", incognito)
+                        restricted()
+                    else:
+                        try:
+                            cmmmd = int(cmmd)
+                            acc = f"{cmmmd:04d}" if cmmmd >= 1000 else f"{cmmmd:03d}"
+                            chronicle_log(f"SCP-{acc} accessed", incognito)
+                            access(acc)
+                        except TypeError:
+                            chronicle_log(f"{cmmd[1]} accessed", incognito)
+                            access(cmmd[1])
+            case "cls" | "clear":
+                os.system('cls' if os.name == 'nt' else 'clear')
+                chronicle_log("<<TERMINAL CLEARED>>", incognito)
+            case cmd if cmd in ccs:
+                ccs[cmd](cmmd, cmd_all)
+            case "esds":
+                os.system('cls' if os.name == 'nt' else 'clear')
+                run_esds(incognito)
+            case _:
+                print(f"{Fore.RED}{cmd} is not an internal or external command | Error: Command Not Found")
+                chronicle_log(f"{cmd} is an unknown command", incognito)
 
 
 if __name__ == '__main__':

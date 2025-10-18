@@ -4,7 +4,7 @@ import pyfiglet
 import colorama
 from modules.dbUtils import GDBConn
 from colorama import Fore
-from modules.authSys import mask_input, save_credentials, check_credentials, get_credentials
+from modules.authSys import mask_input, save_credentials, check_credentials, get_credentials, get_new_creds
 from modules.chronicle_engine import chronicle_log
 
 colorama.init(autoreset=True)
